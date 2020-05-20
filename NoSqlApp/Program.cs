@@ -3,6 +3,7 @@ using Microsoft.Extensions.Configuration;
 using NoSqlApp.Model;
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Net;
 using System.Threading.Tasks;
 
@@ -10,8 +11,8 @@ namespace NoSqlApp
 {
     class Program
     {
-        private static string EndpointUrl;
-        private static string AuthorizationKey;
+        private static string EndpointUrl => Environment.GetEnvironmentVariable("CosmosEndpoint");
+        private static string AuthorizationKey => Environment.GetEnvironmentVariable("CosmosMasterKey");
         private static string DatabaseId;
         private static string ContainerId;
 
@@ -26,8 +27,6 @@ namespace NoSqlApp
             IConfigurationBuilder configBuilder = new ConfigurationBuilder().AddJsonFile("appsettings.json");
             IConfigurationRoot config = configBuilder.Build();
 
-            EndpointUrl = config["CosmosEndpoint"];
-            AuthorizationKey = config["CosmosMasterKey"];
             DatabaseId = config["CosmosDataBaseId"];
             ContainerId = config["CosmosContainerId"];
 
@@ -193,7 +192,6 @@ namespace NoSqlApp
                 Console.WriteLine("\tRead {0}\n", family);
             }
         }
-
 
         /// <summary>
         /// Delete an item in the container
