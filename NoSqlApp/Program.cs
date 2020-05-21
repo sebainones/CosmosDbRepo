@@ -1,6 +1,7 @@
 ﻿using Microsoft.Azure.Cosmos;
 using Microsoft.Extensions.Configuration;
 using NoSqlApp.Model;
+using NoSqlApp.Utils;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -11,8 +12,7 @@ namespace NoSqlApp
 {
     class Program
     {
-        private static string EndpointUrl => Environment.GetEnvironmentVariable("CosmosEndpoint");
-        private static string AuthorizationKey => Environment.GetEnvironmentVariable("CosmosMasterKey");
+
         private static string DatabaseId;
         private static string ContainerId;
 
@@ -30,28 +30,25 @@ namespace NoSqlApp
             DatabaseId = config["CosmosDataBaseId"];
             ContainerId = config["CosmosContainerId"];
 
-            CosmosClient cosmosClient = new CosmosClient(EndpointUrl, AuthorizationKey);
+            await Program.CreateDatabaseAsync();
 
+            await Program.CreateContainerAsync();
 
-            await Program.CreateDatabaseAsync(cosmosClient);
+            await Program.AddItemsToContainerAsync();
 
-            await Program.CreateContainerAsync(cosmosClient);
-
-            await Program.AddItemsToContainerAsync(cosmosClient);
-
-            await Program.QueryItemsAsync(cosmosClient);
-            await Program.DeleteFamilyItemAsync(cosmosClient);
-            await Program.DeleteDatabaseAndCleanupAsync(cosmosClient);
+            await Program.QueryItemsAsync();
+            await Program.DeleteFamilyItemAsync();
+            await Program.DeleteDatabaseAndCleanupAsync();
         }
 
         /// <summary>
         /// Create the database if it does not exist
         /// </summary>
-        private static async Task CreateDatabaseAsync(CosmosClient cosmosClient)
+        private static async Task CreateDatabaseAsync()
         {
             // Create a new database
 
-            DatabaseResponse databaseResponse = await cosmosClient.CreateDatabaseIfNotExistsAsync(DatabaseId);
+            DatabaseResponse databaseResponse = await Shared.Client.CreateDatabaseIfNotExistsAsync(DatabaseId);
 
             if (databaseResponse != null && databaseResponse.Database != null)
                 Console.WriteLine("Created Database: {0}\n", databaseResponse.Database.Id);
@@ -63,10 +60,10 @@ namespace NoSqlApp
         /// Specify "/LastName" as the partition key since we're storing family information, to ensure good distribution of requests and storage.
         /// </summary>
         /// <returns></returns>
-        private static async Task CreateContainerAsync(CosmosClient cosmosClient)
+        private static async Task CreateContainerAsync()
         {
             // Create a new container
-            ContainerResponse containerResponse = await cosmosClient.GetDatabase(DatabaseId).CreateContainerIfNotExistsAsync(ContainerId, "/LastName");
+            ContainerResponse containerResponse = await Shared.Client.GetDatabase(DatabaseId).CreateContainerIfNotExistsAsync(ContainerId, "/LastName");
 
             if (containerResponse.Container != null)
                 Console.WriteLine("Created Container: {0}\n", containerResponse.Container.Id);
@@ -75,7 +72,7 @@ namespace NoSqlApp
         /// <summary>
         /// Add Family items to the container
         /// </summary>
-        private static async Task AddItemsToContainerAsync(CosmosClient cosmosClient)
+        private static async Task AddItemsToContainerAsync()
         {
             // Create a family object for the Andersen family
             Family andersenFamily = new Family
@@ -104,7 +101,7 @@ namespace NoSqlApp
                 IsRegistered = false
             };
 
-            Container container = cosmosClient.GetContainer(Program.DatabaseId, Program.ContainerId);
+            Container container = Shared.Client.GetContainer(Program.DatabaseId, Program.ContainerId);
             try
             {
                 // Read the item to see if it exists.  
@@ -166,13 +163,13 @@ namespace NoSqlApp
         /// <summary>
         /// Run a query (using Azure Cosmos DB SQL syntax) against the container
         /// </summary>
-        private static async Task QueryItemsAsync(CosmosClient cosmosClient)
+        private static async Task QueryItemsAsync()
         {
             var sqlQueryText = "SELECT * FROM c WHERE c.LastName = 'Andersen'";
 
             Console.WriteLine("Running query: {0}\n", sqlQueryText);
 
-            Container container = cosmosClient.GetContainer(Program.DatabaseId, Program.ContainerId);
+            Container container = Shared.Client.GetContainer(Program.DatabaseId, Program.ContainerId);
 
             QueryDefinition queryDefinition = new QueryDefinition(sqlQueryText);
 
@@ -196,11 +193,11 @@ namespace NoSqlApp
         /// <summary>
         /// Delete an item in the container
         /// </summary>
-        private static async Task DeleteFamilyItemAsync(CosmosClient cosmosClient)
+        private static async Task DeleteFamilyItemAsync()
         {
             //CosmosContainer  according to : 
 
-            Container container = cosmosClient.GetContainer(Program.DatabaseId, Program.ContainerId);
+            Container container = Shared.Client.GetContainer(Program.DatabaseId, Program.ContainerId);
 
             string partitionKeyValue = "Wakefield";
             string familyId = "Wakefield.7";
@@ -213,9 +210,9 @@ namespace NoSqlApp
         /// <summary>
         /// Delete the database and dispose of the Cosmos Client instance
         /// </summary>
-        private static async Task DeleteDatabaseAndCleanupAsync(CosmosClient cosmosClient)
+        private static async Task DeleteDatabaseAndCleanupAsync()
         {
-            var database = cosmosClient.GetDatabase(Program.DatabaseId);
+            var database = Shared.Client.GetDatabase(Program.DatabaseId);
             DatabaseResponse databaseResourceResponse = await database.DeleteAsync();
 
             Console.WriteLine("Deleted Database: {0}\n", Program.DatabaseId);
